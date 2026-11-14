@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+	<title>LearnHarness</title>
+	<link rel="stylesheet" href="launcher.css">
+</head>
+<body data-mode="launch" data-loading>
+	<main>
+		<h1>Connect to your server</h1>
+		<p id="notice" hidden></p>
+		<p>Enter the HTTPS address of your LearnHarness server on your Tailscale network. It is saved on this phone only.</p>
+		<form id="form" novalidate>
+			<label for="address">Server address</label>
+			<input id="address" name="address" type="url" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://my-computer.my-tailnet.ts.net">
+			<p id="error" role="alert" hidden></p>
+			<button type="submit">Connect</button>
+		</form>
+	</main>
+	<script src="launcher.js"></script>
+</body>
+</html>

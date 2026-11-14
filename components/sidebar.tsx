@@ -26,6 +26,7 @@ import { PluginWidgets } from "@/components/plugins";
 import { PluginSidebarActions } from "@/components/plugin-chrome";
 import { HostContentRootContext, HostRouteLifetimeProvider } from "@/components/host-content-root";
 import { isInteractionScopeEligible } from "@/components/plugin-input-focus";
+import { initialSidebarOpen, phoneWidthQuery, sidebarPreferenceToStore } from "@/components/sidebar-phone";
 import { InteractionLayersProvider, useInteractionLayers, useOptionalInteractionLayers } from "@/components/interaction-layers";
 
 /**
@@ -94,9 +95,11 @@ declare global {
 	}
 }
 
-const SidebarContext = createContext<{ open: boolean; toggle: () => void }>({
+const SidebarContext = createContext<{ open: boolean; toggle: () => void; dismiss: () => void }>({
 	open: false,
 	toggle: () => {},
+	/** Phone drawer only (sidebar-phone.ts): close after picking a destination. No-op on wide screens. */
+	dismiss: () => {},
 });
 
 export function useSidebar() {
@@ -116,6 +119,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 	const [open, setOpen] = useState(false);
 	const [narrow, setNarrow] = useState(false);
 	const [mounted, setMounted] = useState(false);
+	const [phone, setPhone] = useState(false);
 
 	useEffect(() => {
 		// Electron shell detection (merged chrome, 2026-09-17): keys the
@@ -139,10 +143,24 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 		void window.lh?.getZoom?.().then(setZoomVar);
 
 		const stored = localStorage.getItem(STORAGE_KEY);
-		// Default: open (first run introduces the sidebar).
-		setOpen(stored === null ? true : stored === "1");
+		// Default: open (first run introduces the sidebar). Phone width:
+		// always starts closed (sidebar-phone.ts).
+		const phoneQuery = phoneWidthQuery(window);
+		const isPhone = phoneQuery?.matches ?? false;
+		setPhone(isPhone);
+		setOpen(initialSidebarOpen(stored, isPhone));
 		setMounted(true);
-		return () => off?.();
+		// Crossing the breakpoint (rotation, resize): entering phone width
+		// closes the drawer; leaving it restores the stored choice.
+		const onPhoneChange = (event: MediaQueryListEvent) => {
+			setPhone(event.matches);
+			setOpen(initialSidebarOpen(localStorage.getItem(STORAGE_KEY), event.matches));
+		};
+		phoneQuery?.addEventListener("change", onPhoneChange);
+		return () => {
+			off?.();
+			phoneQuery?.removeEventListener("change", onPhoneChange);
+		};
 	}, []);
 
 	// Narrow-window auto-close/auto-restore (see SIDEBAR_AUTOCLOSE note):
@@ -170,10 +188,15 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 			return;
 		}
 		setOpen((v) => {
-			localStorage.setItem(STORAGE_KEY, v ? "0" : "1");
+			const stored = sidebarPreferenceToStore(!v, phone);
+			if (stored !== null) localStorage.setItem(STORAGE_KEY, stored);
 			return !v;
 		});
-	}, [narrow, open]);
+	}, [narrow, open, phone]);
+
+	const dismiss = useCallback(() => {
+		if (phone) setOpen(false);
+	}, [phone]);
 
 	// ⌘B: the global shortcut dispatches kbdEventForAction("toggle-sidebar")
 	// and the context answers on exactly that name — the shared spelling
@@ -189,7 +212,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
 	}, [toggle]);
 
 	return (
-		<SidebarContext.Provider value={{ open: open && !narrow, toggle }}>
+		<SidebarContext.Provider value={{ open: open && !narrow, toggle, dismiss }}>
 			{/* transitions gated on mount: no slide-in flash on page load */}
 			<div className={cn("flex h-dvh", mounted && "[&_.sidebar-motion]:transition-[width,margin,opacity]")}>{children}</div>
 		</SidebarContext.Provider>
@@ -404,7 +427,7 @@ const KIND_FILTER_KEY = "lh:session-kind-filter";
 
 function SessionsSidebar() {
 	const interactions = useInteractionLayers();
-	const { open, toggle } = useSidebar();
+	const { open, toggle, dismiss } = useSidebar();
 	const [chats, setChats] = useState<ChatListItem[] | null>(null);
 	const [query, setQuery] = useState("");
 	const [kindFilter, setKindFilter] = useState<SessionKindFilter>("all");
@@ -426,7 +449,8 @@ function SessionsSidebar() {
 	   client-side filter over the poll snapshot — no server round trip. */
 	const newSession = useCallback(() => {
 		router.push("/chat/new");
-	}, [router]);
+		dismiss();
+	}, [router, dismiss]);
 
 	/* FUZZY (owner round 8, 2026-10-05): subsequence match ranked by
 	 * fuzzyScore — prefix beats word-boundary beats scattered. Empty query
@@ -653,7 +677,8 @@ function SessionsSidebar() {
 
 	return (
 		<aside
-			className={cn("sidebar-motion shrink-0 overflow-hidden duration-200", open ? "w-72" : "w-0")}
+			className={cn("lh-sidebar sidebar-motion shrink-0 overflow-hidden duration-200", open ? "w-72" : "w-0")}
+			data-open={open}
 			aria-hidden={!open}
 		>
 			<div className="flex h-full w-72 flex-col border-r bg-background">
@@ -680,6 +705,7 @@ function SessionsSidebar() {
 						<Link
 							href="/"
 							aria-label="Home"
+							onClick={dismiss}
 							className="lh-no-drag flex size-9 shrink-0 items-center justify-center rounded-md transition-colors hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50"
 						>
 							<LhMark className="size-6" />
@@ -715,7 +741,7 @@ function SessionsSidebar() {
 						type="button"
 						data-testid="new-session-practice"
 						title="Practice"
-						onClick={() => router.push("/chat/new?mode=practice")}
+						onClick={() => { router.push("/chat/new?mode=practice"); dismiss(); }}
 						className="flex min-w-0 w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 					>
 						<DumbbellIcon className="size-3 shrink-0" />
@@ -774,6 +800,7 @@ function SessionsSidebar() {
 									if (!target) return;
 									e.preventDefault();
 									router.push(`/chat/${target.id}`);
+									dismiss();
 									setKbdIndex(null);
 									e.currentTarget.blur();
 								}
@@ -838,6 +865,7 @@ function SessionsSidebar() {
 									onOpen={() => {
 										setKbdIndex(null);
 										router.push(`/chat/${c.id}`);
+										dismiss();
 									}}
 									onContextMenu={(e) => openContext(e, c)}
 								/>
@@ -860,7 +888,7 @@ function SessionsSidebar() {
 						<Hint label="Settings" action="open-settings" side="right">
 							<button
 								type="button"
-								onClick={() => openSettings()}
+								onClick={() => { openSettings(); dismiss(); }}
 								data-testid="settings-entry"
 								className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs uppercase tracking-wider text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
 							>

@@ -1,0 +1,12 @@
+{
+	"appId": "com.junlov.learnharness",
+	"appName": "LearnHarness",
+	"webDir": "www",
+	"server": {
+		"androidScheme": "https",
+		"allowNavigation": [
+			"*.ts.net"
+		],
+		"errorPath": "unreachable.html"
+	}
+}
