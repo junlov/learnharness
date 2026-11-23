@@ -40,20 +40,27 @@
 	}
 
 	/* Session title: a smaller face that wraps to two lines instead of
-	   truncating after a word; the header grows to fit. */
+	   truncating after a word; the header grows to fit.
+	   The unprefixed line-clamp property must stay unset. In current
+	   Chrome it replaces display:-webkit-box with flow-root, the clamp
+	   stops applying, and the next line paints under the header rule.
+	   overflow:hidden is set here because the button also carries
+	   Tailwind's truncate utility. Vertical padding stays off this
+	   button: with it, the clamped box is two lines plus padding and
+	   the top of the next line paints in that padding. */
 	header.lh-wco-gutter {
 		height: auto;
 		min-height: 3.75rem;
 	}
 	header.lh-wco-gutter > button.font-title {
 		flex-shrink: 1;
+		min-width: 0;
+		overflow: hidden;
 		font-size: 1.25rem;
 		line-height: 1.5rem;
 		white-space: normal;
 		display: -webkit-box;
 		-webkit-box-orient: vertical;
 		-webkit-line-clamp: 2;
-		line-clamp: 2;
-		padding-block: 0.375rem;
 	}
 }
