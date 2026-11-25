@@ -1,0 +1,25 @@
+:root { color-scheme: dark; --bg: #141414; --fg: #ededed; --muted: #9a9a9a; --border: #3a3a3a; --card: #1c1c1c; --danger: #ff8a80; }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+	background: var(--bg); color: var(--fg);
+	font: 16px/1.5 system-ui, sans-serif;
+	display: flex; align-items: center; justify-content: center;
+	padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+}
+body[data-loading] main { visibility: hidden; }
+main { width: 100%; max-width: 420px; }
+h1 { font-size: 22px; margin: 0 0 8px; }
+p { color: var(--muted); margin: 0 0 20px; }
+label { display: block; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+input {
+	width: 100%; padding: 14px; font: inherit; color: var(--fg);
+	background: var(--card); border: 1px solid var(--border); border-radius: 10px; outline: none;
+}
+input:focus { border-color: var(--fg); }
+button {
+	width: 100%; margin-top: 16px; padding: 14px; font: inherit; font-weight: 600;
+	color: var(--bg); background: var(--fg); border: 0; border-radius: 10px;
+}
+#error { color: var(--danger); margin: 10px 0 0; }
+#notice { color: var(--fg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
